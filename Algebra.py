@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 from functools import reduce, singledispatch, partial
 from operator import add
 
