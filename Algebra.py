@@ -1,4 +1,5 @@
 ﻿# -*- coding: utf-8 -*-
+from abc import ABCMeta, abstractmethod
 from functools import reduce, singledispatch, partial
 from operator import add
 
@@ -120,10 +121,11 @@ listFunctor = Functor(lambda f, xs: [f(x) for x in xs])
 #maybe we look at another 3.4 feature: enums
 class Maybe(object):
 
-    def __init__(self):
-        raise Exception("Graar! I'm sorry. Have some fun " +
-            "http://i.imgur.com/EwTCf.jpg")
+    __metaclass__ = ABCMeta
 
+    @abstractmethod
+    def map(self, f):
+        pass
 
 class Nothing(Maybe):
 
