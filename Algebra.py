@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 from abc import ABCMeta, abstractmethod
 from functools import reduce, singledispatch, partial
 from operator import add
@@ -40,7 +40,8 @@ def mappend(a, b):
 
 
 @singledispatch
-def mempty(a):
+def mempty(type_):
+# Don't use this. Use monoid.mempty
     pass
 
 
@@ -124,8 +125,17 @@ class Maybe(object):
     __metaclass__ = ABCMeta
 
     @abstractmethod
+    def isNothing(self):
+        pass
+
+    @abstractmethod
     def map(self, f):
         pass
+
+    @abstractmethod
+    def ap(self, a):
+        pass
+
 
 class Nothing(Maybe):
 
@@ -135,7 +145,13 @@ class Nothing(Maybe):
     def __str__(self):
         return "Nothing"
 
+    def isNothing(self):
+        return True
+
     def map(self, f):
+        return self
+
+    def ap(self, a):
         return self
 
 
@@ -147,8 +163,24 @@ class Just(Maybe):
     def __str__(self):
         return "Just " + self.value.__str__()
 
+    def isNothing(self):
+        return False
+
     def map(self, f):
         return Just(f(self.value))
+
+    def ap(self, a):
+        if a.isNothing():
+            return Nothing()
+        else:
+            v = partial(self.value, a.value)
+            try:
+                v = v()
+            # this seems to be a very bad idea
+            except TypeError:
+                pass
+            return Just(v)
+
 
 #def maybe_fmap(f, may):
 #    if isinstance(may, Just):
@@ -172,3 +204,72 @@ fmap.register(Maybe, flip(maybeFunctor.fmap))
 
 print(fmap(Just(5), partial(add, 2)))
 print(fmap(Nothing(), partial(add, 2)))
+
+
+def const(a):
+    return lambda b: a
+
+
+def id_(a):
+    return a
+
+
+def compose(f, g):
+    return lambda a: f(g(a))
+
+
+class Applicative(Functor):
+
+    def __init__(self, fmap, ap, pure):
+        super(Applicative, self).__init__(fmap)
+        self.ap = ap
+        self.pure = pure
+
+    def right_ap(self, a, b):
+        """
+        *>  f a -> f b -> f b
+        """
+        return self.ap(self.ap(self.pure(const(id_)), a), b)
+
+    def left_ap(self, a, b):
+        """
+        <*  f a -> f b -> f a
+        """
+        return self.ap(self.ap(self.pure(const), a), b)
+
+maybeApplicative = Applicative(maybeFunctor.fmap, lambda f, a: f.ap(a), Just)
+
+
+@singledispatch
+def ap(f, a):
+    pass
+
+
+@singledispatch
+def pure(type_, x):
+# this is worse than mempty.
+    pass
+
+
+def right_ap(a, b):
+    pure_ = pure.registry[type(a)]
+    return ap(ap(pure_(const(id_)), a), b)
+
+
+def left_ap(a, b):
+    pure_ = pure.registry[type(a)]
+    return ap(ap(pure_(const), a), b)
+
+ap.register(Maybe, maybeApplicative.ap)
+pure.register(Maybe, maybeApplicative.pure)
+pure.register(Just, maybeApplicative.pure)
+pure.register(Nothing, maybeApplicative.pure)
+
+f = Just(lambda x: x + 2)
+g = Just(lambda x, y, z: x + y * z)
+
+print(ap(f, Just(3)))
+print(ap(ap(ap(g, Just(3)), Just(4)), Just(5)))
+print(ap(ap(g, Just(3)), Just(4)))
+print(right_ap(Just(3), Just(5)))
+print(left_ap(Just(3), Just(5)))
